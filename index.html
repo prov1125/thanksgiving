@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>🐍 감사 뱀주사위 게임 🎲</title>
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: #fafafa;
+      text-align: center;
+      margin: 0;
+    }
+    h1 { margin: 20px; }
+    #board {
+      width: 1024px;
+      height: 768px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      grid-template-rows: repeat(10, 1fr);
+      border: 3px solid #333;
+      background-image: url('image/dicemap.png');
+      background-size: cover;
+      background-position: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .piece {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid white;
+      position: absolute;
+      transition: all 0.4s ease;
+      z-index: 10;
+    }
+    .p1 { background: red; }
+    .p2 { background: blue; }
+    .p3 { background: green; }
+    .p4 { background: orange; }
+
+    button {
+      padding: 8px 14px;
+      margin: 6px;
+      border: none;
+      border-radius: 6px;
+      background: #4CAF50;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #45a049; }
+
+    #roll-btn {
+      transform: scale(1.5);
+      margin-bottom: 10px;
+      background: #f44336; /* 빨간색 */
+    }
+    #roll-btn:hover { background: #e53935; }
+
+    #sub-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    #sub-buttons button { transform: scale(1); }
+
+    #last-roll {
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+    #bonus-roll-result {
+      font-size: 16px;
+      margin-top: 3px;
+    }
+
+    #victory-screen, #mission-popup, #reward-popup, #dice-popup {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      text-align: center;
+      flex-direction: column;
+      animation: fadeIn 0.5s ease;
+    }
+    #victory-message, .popup-box {
+      background: rgba(255,255,255,0.1);
+      border: 2px solid white;
+      border-radius: 20px;
+      padding: 30px 50px;
+      font-size: 22px;
+      backdrop-filter: blur(5px);
+      animation: popUp 0.5s ease;
+    }
+    @keyframes fadeIn { from {opacity:0;} to {opacity:1;} }
+    @keyframes popUp { from {transform:scale(0.8);opacity:0;} to {transform:scale(1);opacity:1;} }
+    #admin-panel {
+      margin-top: 15px;
+      padding: 10px;
+      border: 2px dashed #999;
+      width: 500px;
+      margin: 0 auto;
+      border-radius: 8px;
+      background: #fff8;
+    }
+  </style>
+</head>
+<body>
+  <h1>🐍 감사 뱀주사위 게임 🎲</h1>
+
+  <div id="setup">
+    <button id="start-btn">게임 시작</button>
+  </div>
+
+  <div id="team-setup" style="display:none;">
+    <h3>팀 이름 입력</h3>
+    <input id="t1" placeholder="팀 1 이름">
+    <input id="t2" placeholder="팀 2 이름">
+    <input id="t3" placeholder="팀 3 이름">
+    <input id="t4" placeholder="팀 4 이름">
+    <br><button id="confirm-teams">확인</button>
+  </div>
+
+  <div id="game" style="display:none;">
+    <div id="board"></div>
+    <p id="turn-display"></p>
+
+    <div id="button-area">
+      <p id="last-roll">주사위: -</p>
+      <button id="roll-btn">🎲 주사위 굴리기</button>
+      <div id="sub-buttons">
+        <button id="skip-btn">⏭ 한 턴 쉬기</button>
+        <div>
+          <button id="bonus-roll-btn">🎲 보너스 주사위</button>
+          <p id="bonus-roll-result">보너스 주사위: -</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="admin-panel">
+      <h4>관리자 권한</h4>
+      <label>팀 선택:
+        <select id="admin-team">
+          <option value="0">팀1</option>
+          <option value="1">팀2</option>
+          <option value="2">팀3</option>
+          <option value="3">팀4</option>
+        </select>
+      </label>
+      <label>이동칸수: <input type="number" id="admin-move" value="1" style="width:50px;"></label>
+      <button id="admin-forward">앞으로</button>
+      <button id="admin-back">뒤로</button>
+      <br>
+      <label>말 바꾸기:
+        <select id="swap-team1">
+          <option value="0">팀1</option>
+          <option value="1">팀2</option>
+          <option value="2">팀3</option>
+          <option value="3">팀4</option>
+        </select>
+        ↔
+        <select id="swap-team2">
+          <option value="0">팀1</option>
+          <option value="1">팀2</option>
+          <option value="2">팀3</option>
+          <option value="3">팀4</option>
+        </select>
+      </label>
+      <button id="swap-btn">바꾸기</button>
+    </div>
+  </div>
+
+  <div id="victory-screen">
+    <div id="victory-message"></div>
+    <button onclick="location.reload()">🔁 다시 시작</button>
+  </div>
+
+  <div id="mission-popup">
+    <div class="popup-box">
+      <h2>🎯 감사 미션 수행!</h2>
+      <button id="mission-success">✅ 성공</button>
+      <button id="mission-fail">❌ 실패</button>
+    </div>
+  </div>
+
+  <div id="reward-popup">
+    <div class="popup-box">
+      <h2>🎁 두근두근 보상 뽑기~~</h2>
+    </div>
+  </div>
+
+  <div id="dice-popup">
+    <div class="popup-box">
+      <h2>🎲 주사위 굴리는 중...</h2>
+      <p id="dice-popup-number" style="font-size: 150px;">1️⃣</p>
+    </div>
+  </div>
+
+  <script>
+    const board = document.getElementById('board');
+    const rollBtn = document.getElementById('roll-btn');
+    const skipBtn = document.getElementById('skip-btn');
+    const bonusRollBtn = document.getElementById('bonus-roll-btn');
+    const turnDisplay = document.getElementById('turn-display');
+    const victoryScreen = document.getElementById('victory-screen');
+    const victoryMessage = document.getElementById('victory-message');
+    const missionPopup = document.getElementById('mission-popup');
+    const rewardPopup = document.getElementById('reward-popup');
+    const dicePopup = document.getElementById('dice-popup');
+    const dicePopupNumber = document.getElementById('dice-popup-number');
+    const lastRoll = document.getElementById('last-roll');
+    const bonusRollResult = document.getElementById('bonus-roll-result');
+
+    const startBtn = document.getElementById('start-btn');
+    const teamSetup = document.getElementById('team-setup');
+    const confirmTeams = document.getElementById('confirm-teams');
+    const gameDiv = document.getElementById('game');
+
+    let teams = [];
+    let positions = [0,0,0,0];
+    let currentPlayer = 0;
+    const questionCells = [12, 22, 33, 44, 50, 55, 68, 89, 98];
+    const diceNumbers = ['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣'];
+    let finishedTeams = [];
+
+    const snakeLadder = {
+      4: 16, 37: 15, 30: 49, 27: 86, 40: 61, 36: 45,
+      62: 43, 71: 53, 87: 54, 57: 76, 97: 78
+    };
+
+    startBtn.addEventListener('click', () => {
+      document.getElementById('setup').style.display = 'none';
+      teamSetup.style.display = 'block';
+    });
+
+    confirmTeams.addEventListener('click', () => {
+      teams = [
+        document.getElementById('t1').value || '팀1',
+        document.getElementById('t2').value || '팀2',
+        document.getElementById('t3').value || '팀3',
+        document.getElementById('t4').value || '팀4'
+      ];
+      teamSetup.style.display = 'none';
+      gameDiv.style.display = 'block';
+      initGame();
+    });
+
+    function initGame() {
+      for(let i=0;i<4;i++){
+        const piece = document.createElement('div');
+        piece.className = `piece p${i+1}`;
+        board.appendChild(piece);
+      }
+      updatePieces();
+      turnDisplay.textContent = `${teams[currentPlayer]}의 차례입니다.`;
+    }
+
+    rollBtn.addEventListener('click', () => {
+      dicePopup.style.display = 'flex';
+      let count = 0;
+      let rollResult = 1;
+      const roulette = setInterval(() => {
+        const idx = Math.floor(Math.random()*6);
+        dicePopupNumber.textContent = diceNumbers[idx];
+        rollResult = idx + 1;
+        count++;
+        if(count >= 20){
+          clearInterval(roulette);
+          setTimeout(() => {
+            dicePopup.style.display = 'none';
+            lastRoll.textContent = `주사위: ${diceNumbers[rollResult-1]}`;
+            movePlayer(currentPlayer, rollResult);
+          }, 500);
+        }
+      }, 100);
+    });
+
+    bonusRollBtn.addEventListener('click', () => {
+      dicePopup.style.display = 'flex';
+      let count = 0;
+      let rollResult = 1;
+      const roulette = setInterval(() => {
+        const idx = Math.floor(Math.random() * 6);
+        dicePopupNumber.textContent = diceNumbers[idx];
+        rollResult = idx + 1;
+        count++;
+        if(count >= 20){
+          clearInterval(roulette);
+          setTimeout(() => { 
+            dicePopup.style.display = 'none';
+            bonusRollResult.textContent = `보너스 주사위: ${diceNumbers[rollResult-1]}`;
+          }, 500);
+        }
+      }, 100);
+    });
+
+    skipBtn.addEventListener('click', () => nextTurn());
+
+    function movePlayer(player, roll){
+      let target = Math.min(positions[player] + roll, 100);
+      let interval = setInterval(()=>{
+        if(positions[player] < target){
+          positions[player]++;
+          updatePieces();
+        }else{
+          clearInterval(interval);
+          if(snakeLadder[positions[player]] !== undefined){
+            const slTarget = snakeLadder[positions[player]];
+            setTimeout(()=>{
+              positions[player] = slTarget;
+              updatePieces();
+            }, 500);
+          }
+          if(positions[player]===100 && !finishedTeams.includes(player)){
+            finishedTeams.push(player);
+            alert(`🎉 ${teams[player]} 팀이 골인했습니다!`);
+          }
+          if(questionCells.includes(positions[player])){
+            triggerMission(player);
+          }else{
+            nextTurn();
+          }
+        }
+      },700);
+    }
+
+    function updatePieces(){
+      const pieces=document.querySelectorAll('.piece');
+      pieces.forEach((piece,i)=>{
+        const pos=positions[i];
+        if(pos===0){
+          piece.style.left='-50px';
+          piece.style.top='728px';
+        }else{
+          const {x,y}=getCoordinates(pos,i);
+          piece.style.left=`${x}px`;
+          piece.style.top=`${y}px`;
+        }
+      });
+    }
+
+    function getCoordinates(pos, idx){
+      const cellX = 102.4;
+      const cellY = 76.8;
+      const row = Math.floor((pos-1)/10);
+      let col = (pos-1)%10;
+      if(row % 2 === 1) col = 9 - col;
+      const offsetX = idx*5;
+      const offsetY = idx*5;
+      const x = col*cellX + 7 + offsetX;
+      const y = 768 - (row+1)*cellY + 7 + offsetY;
+      return {x, y};
+    }
+
+    function nextTurn(){
+      if(finishedTeams.length === 4){
+        victoryMessage.textContent = `🎉 모든 팀이 골인했습니다! 순위: ${finishedTeams.map(i => teams[i]).join(', ')}`;
+        victoryScreen.style.display='flex';
+        return;
+      }
+      do {
+        currentPlayer = (currentPlayer + 1) % 4;
+      } while(finishedTeams.includes(currentPlayer));
+      turnDisplay.textContent = `${teams[currentPlayer]}의 차례입니다.`;
+    }
+
+    function triggerMission(player){
+      missionPopup.style.display='flex';
+      document.getElementById('mission-success').onclick=()=>{
+        missionPopup.style.display='none';
+        rewardPopup.style.display='flex';
+        setTimeout(()=>{
+          rewardPopup.style.display='none';
+          nextTurn();
+        },5000);
+      };
+      document.getElementById('mission-fail').onclick=()=>{
+        missionPopup.style.display='none';
+        nextTurn();
+      };
+    }
+
+    document.getElementById('admin-forward').onclick=()=>{
+      const team=+document.getElementById('admin-team').value;
+      const move=+document.getElementById('admin-move').value;
+      positions[team]=Math.min(positions[team]+move,100);
+      updatePieces();
+    };
+    document.getElementById('admin-back').onclick=()=>{
+      const team=+document.getElementById('admin-team').value;
+      const move=+document.getElementById('admin-move').value;
+      positions[team]=Math.max(positions[team]-move,1);
+      updatePieces();
+    };
+    document.getElementById('swap-btn').onclick = () => {
+      const t1 = +document.getElementById('swap-team1').value;
+      const t2 = +document.getElementById('swap-team2').value;
+      const temp = positions[t1];
+      positions[t1] = positions[t2];
+      positions[t2] = temp;
+      updatePieces();
+    };
+  </script>
+</body>
+</html>
